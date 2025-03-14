@@ -3,67 +3,85 @@
 // the WPILib BSD license file in the root directory of this project.
 
 package frc.robot;
-import java.util.Optional;
-
-import choreo.Choreo;
+import choreo.auto.AutoChooser;
 import choreo.auto.AutoFactory;
-import choreo.trajectory.SwerveSample;
-import choreo.trajectory.Trajectory;
-import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.DriverStation.Alliance;
-import edu.wpi.first.wpilibj.simulation.RoboRioSim;
-import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import choreo.auto.AutoRoutine;
+import choreo.auto.AutoTrajectory;
 import edu.wpi.first.wpilibj.TimedRobot;
-import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
+import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
+import frc.robot.commands.Coral_Intake_Move;
+import frc.robot.commands.Elevator_Levels;
+import frc.robot.commands.ResetPose;
+import frc.robot.subsystems.Coral_InTake;
 import frc.robot.subsystems.DriveTrain;
+import frc.robot.subsystems.Elevator;
 
 public class Robot extends TimedRobot {
   private Command m_autonomousCommand;
- 
-
-  private final DriveTrain driveTrain;
+  
+  public static DriveTrain driveTrain;
+  public static Elevator elevator;
   public static AutoFactory autoFactory;
 
-  private static RobotContainer m_robotContainer;
-  
-  SendableChooser<Command> m_chooser;
-  
-    private final Timer timer;
+  private final RobotContainer m_robotContainer;
 
-    //private final Optional<Trajectory<SwerveSample>> trajectory = Choreo.loadTrajectory("TestPath1");
-    public static Command testPath;
-      
+  private final AutoChooser autoChooser;
+
   public Robot() {
-          m_robotContainer = new RobotContainer();
-          driveTrain = Robot.getRobotContainer().getDriveTrain();
-      
-          autoFactory = new AutoFactory(
+    m_robotContainer = new RobotContainer();
+    driveTrain = m_robotContainer.getDriveTrain();
+    elevator = new Elevator();
+
+              autoFactory = new AutoFactory(
            driveTrain::getPose2d,
            driveTrain::resetPose,
            driveTrain::followTrajectory,
            true, 
            driveTrain);
-      
-          
-          timer = new Timer();
+
+    autoChooser = new AutoChooser();
     
-          testPath = autoFactory.trajectoryCmd("TestPath1");
-    }
-    
-    public static RobotContainer getRobotContainer(){
-      return m_robotContainer;
+    autoChooser.addRoutine("Example Routine", this::exampleRoutine);
+
+    SmartDashboard.putData(autoChooser);
+
+    RobotModeTriggers.autonomous().whileTrue(autoChooser.selectedCommandScheduler());
   }
 
-    /*public static AutoFactory getAutoFactory(){
-      return autoFactory;
-    }*/
+  private AutoRoutine exampleRoutine(){
+    AutoRoutine routine = autoFactory.newRoutine("exampleRoutine");
+
+    AutoTrajectory startToS1 = routine.trajectory("StartToS1");
+    AutoTrajectory s1ToS2 = routine.trajectory("S1ToS2");
+    AutoTrajectory s2ToS3 = routine.trajectory("S2ToS3");
+
+    routine.active().onTrue(Commands.sequence(new ResetPose(driveTrain),startToS1.cmd()));
+
+    startToS1.done().onTrue(new SequentialCommandGroup(
+      new Elevator_Levels(m_robotContainer.getElevator(), 4, 0, 0), 
+      new Coral_Intake_Move(m_robotContainer.getCoral_InTake(),.2),
+      new Coral_Intake_Move(m_robotContainer.getCoral_InTake(), -RobotMap.coralspeed)).andThen(new SequentialCommandGroup(new Elevator_Levels(elevator, 0, 0, 0), s1ToS2.cmd())));
+
+    s1ToS2.done().onTrue(new Coral_Intake_Move(m_robotContainer.getCoral_InTake(), RobotMap.coralspeed).andThen(s2ToS3.cmd()));
+
+    s2ToS3.done().onTrue(new SequentialCommandGroup(
+      new Elevator_Levels(m_robotContainer.getElevator(), 4, 0, 0), 
+      new Coral_Intake_Move(m_robotContainer.getCoral_InTake(),.2),
+      new Coral_Intake_Move(m_robotContainer.getCoral_InTake(), -RobotMap.coralspeed)));
+
+    return routine;
+  }
 
   @Override
   public void robotPeriodic() {
     CommandScheduler.getInstance().run();
+
+
   }
 
   @Override
@@ -75,39 +93,17 @@ public class Robot extends TimedRobot {
   @Override
   public void disabledExit() {}
 
-  private boolean isRedAlliance() {
-      return DriverStation.getAlliance().orElse(Alliance.Blue).equals(Alliance.Red);
-  }
-
   @Override
   public void autonomousInit() {
-            /*if (trajectory.isPresent()) {
-            Optional<Pose2d> initialPose = trajectory.get().getInitialPose(isRedAlliance());
+    m_autonomousCommand = m_robotContainer.getAutonomousCommand();
 
-            if (initialPose.isPresent()) {
-                driveTrain.resetPose(initialPose.get());
-            }
-        }*/
-
-        timer.restart();
-
-    testPath.schedule();
-        
-    
+    if (m_autonomousCommand != null) {
+      m_autonomousCommand.schedule();
+    }
   }
 
   @Override
-  public void autonomousPeriodic() {
-    /*
-       if (trajectory.isPresent()) {
-      Optional<SwerveSample> sample = trajectory.get().sampleAt(timer.get(), isRedAlliance());
-
-      if (sample.isPresent()) {
-          driveTrain.followTrajectory(sample);
-      }
-          
-  }*/
-  }
+  public void autonomousPeriodic() {}
 
   @Override
   public void autonomousExit() {}
