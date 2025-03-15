@@ -14,7 +14,7 @@ import frc.robot.RobotMap;
 
 public class Elevator extends SubsystemBase {
   /** Creates a new Elevator. */
-  public static final double[] SETPOINTS = new double[]{0.0, 6.96, 14.32, 25.41 , 41.00};
+  public static final double[] SETPOINTS = new double[]{0.0, 8.272, 18.22, 30 , 45.11};
   SparkMax elevatorMotor1;
   SparkMax elevatorMotro2;
   Tej_Subs lights;
